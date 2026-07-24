@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>The NotePad</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Bungee&family=DM+Serif+Display:ital@0;1&family=Major+Mono+Display&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:wght@400;600&family=Caveat:wght@600;700&family=Sixtyfour&family=Cutive+Mono&family=Unbounded:wght@400;600;800&family=Dancing+Script:wght@500;700&family=Shadows+Into+Light&family=Homemade+Apple&family=Permanent+Marker&family=Special+Elite&family=VT323&family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --void:#050609;
+    --panel:#0a0e14;
+    --panel2:#0d131c;
+    --edge: rgba(120,220,255,.16);
+    --edge-bright: rgba(120,220,255,.55);
+    --cyan:#4de8ff;
+    --cyan-dim:#1a6b7a;
+    --magenta:#ff3ea5;
+    --amber:#ffb84d;
+    --green:#39ff88;
+    --text-dim:#7d93a8;
+    --text-bright:#d6f3ff;
+    --paper:#f4ecd8;
+    --text-col:#241c14;
+    --accent-glow: 0 0 0 rgba(255,184,77,0);
+    --grain-opacity: 0.05;
+    --paper-tilt: 0deg;
+    --stroke-w: 0px;
+    --stroke-col: transparent;
+    --blur: 0px;
+    --caret-col: #ffb84d;
+  }
+
+  *{box-sizing:border-box;}
+  ::selection{ background:var(--cyan); color:#001018; }
+
+  html,body{
+    margin:0;
+    height:100vh;
+    width:100vw;
+    background:var(--void);
+    font-family:'Rajdhani', sans-serif;
+    color:var(--text-bright);
+    overflow:hidden;
+  }
+
+  body::before{
+    content:"";
+    position:fixed; inset:0;
+    pointer-events:none;
+    z-index:999;
+    opacity:var(--grain-opacity);
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    mix-blend-mode:overlay;
+  }
+
+  body.scanlines::after{
+    content:"";
+    position:fixed; inset:0;
+    pointer-events:none;
+    z-index:998;
+    background:repeating-linear-gradient(0deg, rgba(0,0,0,.25) 0px, rgba(0,0,0,.25) 1px, transparent 2px, transparent 3px);
+    animation: scan-move 9s linear infinite;
+  }
+  @keyframes scan-move{ 0%{background-position-y:0;} 100%{background-position-y:1000px;} }
+
+  .app{
+    height:100vh;
+    width:100vw;
+    display:grid;
+    grid-template-rows: 40px 1fr;
+    background:
+      linear-gradient(180deg, rgba(77,232,255,.04), transparent 200px),
+      radial-gradient(ellipse 60% 40% at 15% 0%, rgba(77,232,255,.06), transparent 60%),
+      radial-gradient(ellipse 50% 40% at 100% 100%, rgba(255,62,165,.05), transparent 55%),
+      var(--void);
+  }
+
+  .topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:0 16px;
+    border-bottom:1px solid var(--edge);
+    background:linear-gradient(180deg, rgba(13,19,28,.9), rgba(10,14,20,.6));
+    position:relative;
+    overflow:hidden;
+  }
+  .topbar::after{
+    content:"";
+    position:absolute; top:0; left:-40%;
+    width:40%; height:100%;
+    background:linear-gradient(90deg, transparent, rgba(77,232,255,.12), transparent);
+    animation: sweep 5s linear infinite;
+  }
+  @keyframes sweep{ 0%{left:-40%;} 100%{left:110%;} }
+
+  .brand{ display:flex; align-items:center; gap:10px; z-index:1; }
+  .brand .led{
+    width:8px;height:8px;border-radius:50%;
+    background:var(--cyan);
+    box-shadow:0 0 8px 2px var(--cyan);
+    animation:pulse 2.2s ease-in-out infinite;
+  }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.3;} }
+  .brand h1{
+    font-family:'Orbitron', sans-serif;
+    font-weight:900;
+    font-size:15px;
+    letter-spacing:4px;
+    margin:0;
+    color:var(--text-bright);
+    text-shadow:0 0 14px rgba(77,232,255,.5);
+  }
+  .brand span{
+    font-size:9px;
+    letter-spacing:3px;
+    color:var(--text-dim);
+    font-family:'Rajdhani',sans-serif;
+    font-weight:600;
+  }
+  .topbar-right{ display:flex; align-items:center; gap:18px; z-index:1; font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--text-dim); letter-spacing:1px;}
+  .topbar-right b{ color:var(--cyan); font-weight:600; }
+  .vu{ display:flex; gap:4px; }
+  .vu i{ width:6px;height:6px;border-radius:1px; background:rgba(77,232,255,.15); display:block; }
+  .vu i.lit{ background:var(--magenta); box-shadow:0 0 6px var(--magenta); }
+
+  .main{
+    display:grid;
+    grid-template-columns: 54px 296px 1fr;
+    min-height:0;
+  }
+
+  .tabrail{
+    background:var(--panel);
+    border-right:1px solid var(--edge);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:10px 0;
+    gap:5px;
+    overflow-y:auto;
+  }
+  .tabrail::-webkit-scrollbar{ width:0; }
+  .tab{
+    width:38px; height:36px;
+    display:flex; align-items:center; justify-content:center;
+    border:1px solid transparent;
+    border-radius:3px;
+    color:var(--text-dim);
+    font-family:'Orbitron', sans-serif;
+    font-size:8.5px;
+    font-weight:700;
+    letter-spacing:.5px;
+    cursor:pointer;
+    position:relative;
+    transition:.15s;
+    clip-path: polygon(15% 0, 100% 0, 100% 85%, 85% 100%, 0 100%, 0 15%);
+    background:rgba(255,255,255,.02);
+    flex-shrink:0;
+  }
+  .tab:hover{ color:var(--text-bright); background:rgba(77,232,255,.06); }
+  .tab.active{
+    color:var(--void);
+    background:var(--cyan);
+    box-shadow:0 0 16px rgba(77,232,255,.55);
+  }
+  .tab .bar{
+    position:absolute; left:-11px; top:50%; transform:translateY(-50%);
+    width:3px; height:0; background:var(--cyan);
+    transition:.15s; border-radius:2px;
+  }
+  .tab.active .bar{ height:16px; box-shadow:0 0 8px var(--cyan); }
+
+  .panelcol{
+    background:linear-gradient(180deg, var(--panel2), var(--panel));
+    border-right:1px solid var(--edge);
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+    min-height:0;
+    min-width:0;
+  }
+  .panel-scroll{
+    overflow-y:auto;
+    overflow-x:hidden;
+    padding:16px 16px 20px;
+    flex:1;
+    min-height:0;
+  }
+  .panel-scroll::-webkit-scrollbar{ width:5px; }
+  .panel-scroll::-webkit-scrollbar-track{ background:transparent; }
+  .panel-scroll::-webkit-scrollbar-thumb{ background:var(--edge); border-radius:3px; }
+
+  .section{ display:none; animation: fadein .18s ease; }
+  .section.active{ display:block; }
+  @keyframes fadein{ from{ opacity:0; transform:translateX(-4px);} to{opacity:1; transform:translateX(0);} }
+
+  .section-head{
+    font-family:'Orbitron', sans-serif;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:3px;
+    color:var(--cyan);
+    margin:0 0 16px;
+    padding-bottom:8px;
+    border-bottom:1px solid var(--edge);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  }
+  .section-head::before{ content:"//"; color:var(--edge-bright); margin-right:6px; }
+
+  .row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:14px;
+    min-width:0;
+  }
+  .row:last-child{margin-bottom:0;}
+  .row label{
+    font-size:12px;
+    font-weight:600;
+    color:var(--text-dim);
+    letter-spacing:.5px;
+    flex-shrink:0;
+  }
+
+  input[type=range]{
+    -webkit-appearance:none; appearance:none;
+    flex:1; min-width:0; height:3px; border-radius:2px;
+    background:linear-gradient(90deg, var(--cyan-dim), var(--edge));
+    outline:none; cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:13px;height:13px;border-radius:2px;
+    background:var(--cyan);
+    box-shadow:0 0 8px rgba(77,232,255,.7);
+    cursor:grab;
+    margin-top:-5px;
+    transform:rotate(45deg);
+  }
+  input[type=range]::-moz-range-thumb{
+    width:13px;height:13px;border:none;border-radius:2px;
+    background:var(--cyan); box-shadow:0 0 8px rgba(77,232,255,.7);
+    transform:rotate(45deg);
+  }
+
+  select, .text-input{
+    flex:1;
+    min-width:0;
+    background:#060a0f;
+    border:1px solid var(--edge);
+    color:var(--text-bright);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    padding:7px 8px;
+    border-radius:3px;
+    outline:none;
+    cursor:pointer;
+  }
+  .text-input{ cursor:text; }
+  select:focus, .text-input:focus{ border-color:var(--cyan); }
+
+  input[type=color]{
+    -webkit-appearance:none;
+    width:30px;height:22px;
+    border:1px solid var(--edge);
+    border-radius:3px;
+    background:none; cursor:pointer; padding:0;
+    flex-shrink:0;
+  }
+  input[type=color]::-webkit-color-swatch-wrapper{padding:2px;}
+  input[type=color]::-webkit-color-swatch{border-radius:2px; border:none;}
+
+  .switch{
+    position:relative; width:36px; height:19px;
+    background:#060a0f;
+    border:1px solid var(--edge);
+    border-radius:2px;
+    cursor:pointer; flex-shrink:0;
+  }
+  .switch .knob{
+    position:absolute; top:2px; left:2px;
+    width:13px; height:13px; border-radius:1px;
+    background:#2a3d4d;
+    transition:.2s ease;
+  }
+  .switch.on{ background:rgba(77,232,255,.15); border-color:var(--cyan); }
+  .switch.on .knob{ left:19px; background:var(--cyan); box-shadow:0 0 8px rgba(77,232,255,.8); }
+  .switch.magenta.on{ background:rgba(255,62,165,.15); border-color:var(--magenta); }
+  .switch.magenta.on .knob{ background:var(--magenta); box-shadow:0 0 8px rgba(255,62,165,.8); }
+
+  .pad-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+  .pad{
+    background:rgba(255,255,255,.02);
+    border:1px solid var(--edge);
+    border-radius:3px;
+    padding:8px 4px;
+    color:var(--text-dim);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:9px;
+    letter-spacing:.5px;
+    text-align:center;
+    cursor:pointer;
+    transition:.12s;
+  }
+  .pad:hover{ border-color:var(--cyan); color:var(--text-bright); }
+  .pad.active{
+    border-color:var(--cyan);
+    color:var(--void);
+    background:var(--cyan);
+    box-shadow:0 0 10px rgba(77,232,255,.4);
+  }
+
+  .chaos-btn{
+    width:100%;
+    padding:13px 8px;
+    background:linear-gradient(135deg, var(--magenta), #8b3fff);
+    border:none; border-radius:3px;
+    color:#fff;
+    font-family:'Orbitron', sans-serif;
+    font-weight:700;
+    font-size:11px;
+    letter-spacing:1.5px;
+    cursor:pointer;
+    box-shadow:0 4px 18px rgba(255,62,165,.3);
+    transition:.15s;
+    clip-path: polygon(6% 0, 100% 0, 100% 70%, 94% 100%, 0 100%, 0 30%);
+  }
+  .chaos-btn:hover{ box-shadow:0 6px 22px rgba(255,62,165,.5); filter:brightness(1.1); }
+  .chaos-btn:active{ transform:scale(.98); }
+
+  .reset-btn, .upload-btn{
+    width:100%; margin-top:8px;
+    padding:9px 8px;
+    background:transparent;
+    border:1px solid var(--edge);
+    border-radius:3px;
+    color:var(--text-dim);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10px; letter-spacing:1px; cursor:pointer;
+  }
+  .reset-btn:hover{ color:var(--text-bright); border-color:var(--text-dim); }
+  .upload-btn{ color:var(--green); border-color:rgba(57,255,136,.3); margin-top:0; }
+  .upload-btn:hover{ border-color:var(--green); box-shadow:0 0 10px rgba(57,255,136,.15); }
+
+  .font-list{ font-size:9.5px; color:var(--text-dim); margin-top:8px; line-height:1.6; word-break:break-all; }
+  .font-list b{ color:var(--green); }
+  .note{ font-size:9px; color:#4f6274; line-height:1.5; margin-top:10px; }
+
+  .mini-btn{
+    background:rgba(255,255,255,.03);
+    border:1px solid var(--edge);
+    color:var(--text-bright);
+    border-radius:3px;
+    width:32px; height:28px;
+    cursor:pointer;
+    font-size:13px;
+    flex-shrink:0;
+  }
+  .mini-btn:hover{ border-color:var(--cyan); color:var(--cyan); }
+  .mini-btn:disabled{ opacity:.3; cursor:default; }
+
+  .doc-tabs{ display:flex; flex-direction:column; gap:6px; margin-bottom:10px; max-height:160px; overflow-y:auto; }
+  .doc-tabs::-webkit-scrollbar{ width:4px; }
+  .doc-tabs::-webkit-scrollbar-thumb{ background:var(--edge); }
+  .doc-item{
+    display:flex; align-items:center; justify-content:space-between;
+    background:rgba(255,255,255,.02);
+    border:1px solid var(--edge);
+    border-radius:3px;
+    padding:7px 9px;
+    cursor:pointer;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    color:var(--text-dim);
+  }
+  .doc-item:hover{ border-color:var(--cyan); color:var(--text-bright); }
+  .doc-item.active{ border-color:var(--cyan); color:var(--cyan); background:rgba(77,232,255,.06); }
+  .doc-item .del{ color:#5a4550; font-size:12px; padding:0 2px; }
+  .doc-item .del:hover{ color:var(--magenta); }
+
+  .emoji-grid{
+    display:grid; grid-template-columns:repeat(6,1fr); gap:5px;
+  }
+  .emoji-btn{
+    background:rgba(255,255,255,.02);
+    border:1px solid var(--edge);
+    border-radius:3px;
+    font-size:16px;
+    padding:6px 0;
+    cursor:pointer;
+    text-align:center;
+  }
+  .emoji-btn:hover{ border-color:var(--cyan); background:rgba(77,232,255,.08); transform:scale(1.08); }
+
+  .stage{
+    position:relative;
+    display:flex; align-items:center; justify-content:center;
+    padding:26px;
+    overflow:hidden;
+    min-height:0;
+    transition:background .4s ease;
+  }
+
+  #matrixCanvas{
+    position:absolute; inset:0; width:100%; height:100%;
+    z-index:0; pointer-events:none; opacity:0;
+    transition:opacity .5s ease;
+  }
+  #matrixCanvas.on{ opacity:.5; }
+
+  .hud-corner{ position:absolute; width:22px; height:22px; border-color:var(--edge-bright); z-index:2; pointer-events:none; opacity:.5;}
+  .hud-corner.tl{ top:14px; left:14px; border-top:2px solid; border-left:2px solid; }
+  .hud-corner.tr{ top:14px; right:14px; border-top:2px solid; border-right:2px solid; }
+  .hud-corner.bl{ bottom:14px; left:14px; border-bottom:2px solid; border-left:2px solid; }
+  .hud-corner.br{ bottom:14px; right:14px; border-bottom:2px solid; border-right:2px solid; }
+
+  .paper-wrap{
+    position:relative; z-index:1;
+    width:min(820px, 100%);
+    height:100%;
+    max-height:100%;
+    transform: rotate(var(--paper-tilt));
+    transition:transform .3s ease, box-shadow .3s ease;
+  }
+
+  .paper{
+    width:100%;
+    height:100%;
+    border:none; outline:none; resize:none;
+    padding:44px 52px;
+    background:var(--paper);
+    color:var(--text-col);
+    -webkit-text-fill-color:var(--text-col);
+    caret-color:var(--caret-col);
+    font-size:18px; line-height:1.6; letter-spacing:0px;
+    border-radius:2px;
+    box-shadow:
+      0 30px 70px -20px rgba(0,0,0,.7),
+      0 0 0 1px rgba(77,232,255,.15),
+      var(--accent-glow);
+    -webkit-text-stroke: var(--stroke-w) var(--stroke-col);
+    filter: blur(var(--blur));
+    overflow-y:auto;
+  }
+  .paper::-webkit-scrollbar{ width:10px; }
+  .paper::-webkit-scrollbar-track{ background:transparent; }
+  .paper::-webkit-scrollbar-thumb{ background:rgba(0,0,0,.2); border-radius:6px; }
+  .paper::selection{ background:var(--cyan); color:#001018; }
+  .paper::placeholder{ color:rgba(0,0,0,.28); font-style:italic; -webkit-text-fill-color:rgba(0,0,0,.28); }
+
+  .tex-lines .paper{ background-image:repeating-linear-gradient(var(--paper), var(--paper) 31px, rgba(0,0,0,.08) 32px); background-attachment:local; }
+  .tex-grid .paper{ background-image: linear-gradient(rgba(0,0,0,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.06) 1px, transparent 1px); background-size:24px 24px; background-attachment:local; }
+  .tex-dots .paper{ background-image:radial-gradient(rgba(0,0,0,.15) 1px, transparent 1px); background-size:20px 20px; background-attachment:local; }
+
+  .grad-text .paper{
+    background-image: linear-gradient(135deg, var(--g1), var(--g2));
+    background-clip:text; -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent; color:transparent;
+  }
+
+  .glitch-on .paper{ animation: glitch-jump 3.4s infinite steps(1); }
+  @keyframes glitch-jump{
+    0%, 92%, 100% { text-shadow: var(--accent-glow); transform:translate(0,0); }
+    93% { text-shadow: 2px 0 var(--magenta), -2px 0 var(--cyan); transform:translate(-1px,0); }
+    94% { text-shadow: -2px 0 var(--magenta), 2px 0 var(--cyan); transform:translate(1px,0); }
+    95% { text-shadow: 2px 1px var(--magenta), -2px -1px var(--cyan); transform:translate(0,-1px); }
+    96% { text-shadow: var(--accent-glow); transform:translate(0,0); }
+  }
+
+  .status{
+    position:absolute; bottom:2px; left:26px; right:26px;
+    display:flex; justify-content:space-between;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10px; color:var(--text-dim); letter-spacing:1px;
+    z-index:2; pointer-events:none;
+  }
+  .status b{ color:var(--cyan); font-weight:600; }
+
+  @media (max-width:900px){
+    .main{ grid-template-columns: 44px 240px 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <div class="topbar">
+    <div class="brand">
+      <span class="led"></span>
+      <div><h1>SCRIBE//9000</h1></div>
+      <span style="margin-left:6px;">TEXT SYNTHESIS CONSOLE</span>
+    </div>
+    <div class="topbar-right">
+      <span>WORDS <b id="wordCount">0</b></span>
+      <span>CHARS <b id="charCount">0</b></span>
+      <span id="clock">00:00:00</span>
+      <div class="vu"><i></i><i></i><i></i><i></i></div>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <div class="tabrail">
+      <div class="tab active" data-tab="type"><span class="bar"></span>TYP</div>
+      <div class="tab" data-tab="font"><span class="bar"></span>FNT</div>
+      <div class="tab" data-tab="color"><span class="bar"></span>CLR</div>
+      <div class="tab" data-tab="fx"><span class="bar"></span>FX</div>
+      <div class="tab" data-tab="glitch"><span class="bar"></span>GLI</div>
+      <div class="tab" data-tab="doc"><span class="bar"></span>DOC</div>
+      <div class="tab" data-tab="fnd"><span class="bar"></span>FND</div>
+      <div class="tab" data-tab="emj"><span class="bar"></span>EMJ</div>
+      <div class="tab" data-tab="sys"><span class="bar"></span>SYS</div>
+    </div>
+
+    <div class="panelcol">
+      <div class="panel-scroll">
+
+        <!-- TYPE -->
+        <div class="section active" id="sec-type">
+          <p class="section-head">TYPOGRAPHY</p>
+          <div class="row"><label>Weight</label><input type="range" id="weight" min="100" max="900" step="100" value="400"></div>
+          <div class="row"><label>Size</label><input type="range" id="size" min="10" max="64" step="1" value="18"></div>
+          <div class="row"><label>Line height</label><input type="range" id="lineHeight" min="0.8" max="3" step="0.05" value="1.6"></div>
+          <div class="row"><label>Letter space</label><input type="range" id="letterSpace" min="-3" max="20" step="0.5" value="0"></div>
+          <div class="row"><label>Italic</label><div class="switch" id="italicToggle"><div class="knob"></div></div></div>
+          <div class="row" style="margin-top:4px;"><label>Align</label></div>
+          <div class="pad-grid" id="alignPads">
+            <div class="pad active" data-align="left">LEFT</div>
+            <div class="pad" data-align="center">CTR</div>
+            <div class="pad" data-align="right">RIGHT</div>
+          </div>
+          <div class="row" style="margin-top:14px;"><label>Transform</label></div>
+          <div class="pad-grid" id="casePads">
+            <div class="pad active" data-case="none">NONE</div>
+            <div class="pad" data-case="uppercase">UPPER</div>
+            <div class="pad" data-case="capitalize">TITLE</div>
+          </div>
+          <p class="section-head" style="margin-top:18px;">CURSOR</p>
+          <div class="row"><label>Caret color</label><input type="color" id="caretColor" value="#ffb84d"></div>
+          <div class="row"><label>Blink pulse</label><input type="range" id="caretBlink" min="0" max="10" step="1" value="0"></div>
+        </div>
+
+        <!-- FONT -->
+        <div class="section" id="sec-font">
+          <p class="section-head">TYPEFACE</p>
+          <div class="row">
+            <label>Font</label>
+            <select id="fontSelect">
+              <optgroup label="Monospace / Code">
+                <option value="'Space Mono', monospace" selected>Space Mono</option>
+                <option value="'IBM Plex Mono', monospace">IBM Plex Mono</option>
+                <option value="'Cutive Mono', monospace">Cutive Mono</option>
+                <option value="'VT323', monospace">VT323 (terminal)</option>
+                <option value="'Major Mono Display', monospace">Major Mono</option>
+                <option value="'Sixtyfour', monospace">Sixtyfour (glitch)</option>
+              </optgroup>
+              <optgroup label="Classic / Serif">
+                <option value="'Times New Roman', Times, serif">Times New Roman</option>
+                <option value="Georgia, serif">Georgia</option>
+                <option value="'DM Serif Display', serif">DM Serif Display</option>
+                <option value="'Playfair Display', serif">Playfair Display</option>
+              </optgroup>
+              <optgroup label="Handwritten / Human">
+                <option value="'Caveat', cursive">Caveat</option>
+                <option value="'Dancing Script', cursive">Dancing Script</option>
+                <option value="'Shadows Into Light', cursive">Shadows Into Light</option>
+                <option value="'Homemade Apple', cursive">Homemade Apple</option>
+                <option value="'Permanent Marker', cursive">Permanent Marker</option>
+                <option value="'Special Elite', cursive">Special Elite</option>
+              </optgroup>
+              <optgroup label="Display">
+                <option value="'Bungee', cursive">Bungee</option>
+                <option value="'Unbounded', sans-serif">Unbounded</option>
+              </optgroup>
+              <optgroup id="customFontGroup" label="Your Uploaded Fonts" style="display:none;"></optgroup>
+            </select>
+          </div>
+          <input type="file" id="fontFile" accept=".ttf,.otf,.woff,.woff2" style="display:none;">
+          <button class="upload-btn" id="fontUploadBtn">⇪ UPLOAD .TTF / .OTF / .WOFF</button>
+          <div class="font-list" id="fontList">No custom fonts loaded.</div>
+          <p class="note">Uploaded fonts stay active for this browser tab only — they clear on reload, nothing is sent anywhere.</p>
+        </div>
+
+        <!-- COLOR -->
+        <div class="section" id="sec-color">
+          <p class="section-head">INK &amp; PAPER</p>
+          <div class="row"><label>Gradient fill</label><div class="switch" id="gradToggle"><div class="knob"></div></div></div>
+          <div class="row"><label>Text color</label><input type="color" id="textColor" value="#241c14"></div>
+          <div class="row" id="gradRow" style="display:none;"><label>Gradient 2</label><input type="color" id="gradColor2" value="#ff5b9c"></div>
+          <div class="row"><label>Paper color</label><input type="color" id="paperColor" value="#f4ecd8"></div>
+          <div class="row"><label>Backdrop</label><input type="color" id="bgColor" value="#050609"></div>
+          <div class="row" style="margin-top:4px;"><label>Texture</label></div>
+          <div class="pad-grid" id="texPads">
+            <div class="pad active" data-tex="none">PLAIN</div>
+            <div class="pad" data-tex="lines">LINED</div>
+            <div class="pad" data-tex="grid">GRID</div>
+          </div>
+        </div>
+
+        <!-- FX -->
+        <div class="section" id="sec-fx">
+          <p class="section-head">FX CHAIN</p>
+          <div class="row"><label>Glow</label><input type="range" id="glow" min="0" max="40" step="1" value="0"></div>
+          <div class="row"><label>Shadow</label><input type="range" id="shadow" min="0" max="20" step="1" value="0"></div>
+          <div class="row"><label>Outline</label><input type="range" id="stroke" min="0" max="3" step="0.25" value="0"></div>
+          <div class="row"><label>Soft blur</label><input type="range" id="blur" min="0" max="4" step="0.1" value="0"></div>
+          <div class="row"><label>Paper tilt</label><input type="range" id="tilt" min="-6" max="6" step="0.2" value="0"></div>
+          <div class="row"><label>Grain</label><input type="range" id="grain" min="0" max="20" step="1" value="5"></div>
+        </div>
+
+        <!-- GLITCH -->
+        <div class="section" id="sec-glitch">
+          <p class="section-head">MATRIX MODE</p>
+          <div class="row"><label>Digital rain</label><div class="switch magenta" id="matrixToggle"><div class="knob"></div></div></div>
+          <div class="row"><label>Text glitch</label><div class="switch magenta" id="glitchToggle"><div class="knob"></div></div></div>
+          <div class="row"><label>Scanlines</label><div class="switch magenta" id="scanToggle"><div class="knob"></div></div></div>
+        </div>
+
+        <!-- DOC -->
+        <div class="section" id="sec-doc">
+          <p class="section-head">DOCUMENTS</p>
+          <div class="doc-tabs" id="docTabs"></div>
+          <button class="upload-btn" id="addDocBtn">+ NEW DOCUMENT</button>
+
+          <p class="section-head" style="margin-top:18px;">HISTORY</p>
+          <div class="row">
+            <label>Undo / Redo</label>
+            <div style="display:flex; gap:6px;">
+              <button class="mini-btn" id="undoBtn">↶</button>
+              <button class="mini-btn" id="redoBtn">↷</button>
+            </div>
+          </div>
+          <input type="range" id="historyScrub" min="0" max="0" value="0" style="width:100%;">
+          <p class="note" id="historyNote">1 / 1 snapshots</p>
+
+          <p class="section-head" style="margin-top:18px;">IMPORT / EXPORT</p>
+          <input type="file" id="importFile" accept=".txt,.md" style="display:none;">
+          <button class="upload-btn" id="importBtn">⇩ IMPORT .TXT / .MD</button>
+          <div class="pad-grid" style="margin-top:8px;">
+            <div class="pad" id="exportTxt">.TXT</div>
+            <div class="pad" id="exportMd">.MD</div>
+            <div class="pad" id="exportPdf">.PDF</div>
+          </div>
+        </div>
+
+        <!-- FIND & REPLACE -->
+        <div class="section" id="sec-fnd">
+          <p class="section-head">FIND &amp; REPLACE</p>
+          <div class="row"><label>Find</label><input type="text" id="findInput" class="text-input" placeholder="search text"></div>
+          <div class="row"><label>Replace</label><input type="text" id="replaceInput" class="text-input" placeholder="replace with"></div>
+          <div class="pad-grid">
+            <div class="pad" id="findNextBtn">NEXT</div>
+            <div class="pad" id="replaceBtn">REPLACE</div>
+            <div class="pad" id="replaceAllBtn">ALL</div>
+          </div>
+          <p class="note" id="findStatus">Type a term and hit NEXT to jump to it — matches are shown via text selection.</p>
+        </div>
+
+        <!-- EMOJI -->
+        <div class="section" id="sec-emj">
+          <p class="section-head">SYMBOLS &amp; EMOJI</p>
+          <div class="emoji-grid" id="emojiGrid"></div>
+          <p class="note">Click a symbol to insert it at your cursor.</p>
+        </div>
+
+        <!-- SYS -->
+        <div class="section" id="sec-sys">
+          <p class="section-head">MASTER</p>
+          <button class="chaos-btn" id="chaosBtn">⚡ RANDOMIZE EVERYTHING</button>
+          <button class="reset-btn" id="resetBtn">↺ RESET TO DEFAULT</button>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="stage" id="stage">
+      <canvas id="matrixCanvas"></canvas>
+      <span class="hud-corner tl"></span>
+      <span class="hud-corner tr"></span>
+      <span class="hud-corner bl"></span>
+      <span class="hud-corner br"></span>
+      <div class="paper-wrap" id="paperWrap">
+        <textarea class="paper" id="paper" spellcheck="false" placeholder="Start typing… then wreck it with the panel on the left."></textarea>
+      </div>
+      <div class="status">
+        <span id="docNameStatus">◈ Untitled-1</span>
+        <span id="stageClock">READY</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const paper = $('paper');
+const wrap = $('paperWrap');
+const stage = $('stage');
+
+const state = {
+  font: "'Space Mono', monospace",
+  weight: 400,
+  size: 18,
+  lineHeight: 1.6,
+  letterSpace: 0,
+  italic: false,
+  align: 'left',
+  textCase: 'none',
+  textColor: '#241c14',
+  gradient: false,
+  gradColor2: '#ff5b9c',
+  paperColor: '#f4ecd8',
+  bgColor: '#050609',
+  texture: 'none',
+  glow: 0,
+  shadow: 0,
+  stroke: 0,
+  blur: 0,
+  tilt: 0,
+  grain: 5,
+  matrix: false,
+  glitch: false,
+  scanlines: false,
+  caretColor: '#ffb84d',
+  caretBlink: 0
+};
+
+// ===== tab switching =====
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+    tab.classList.add('active');
+    $('sec-'+tab.dataset.tab).classList.add('active');
+  });
+});
+
+function apply(){
+  paper.style.fontFamily = state.font;
+  paper.style.fontWeight = state.weight;
+  paper.style.fontStyle = state.italic ? 'italic' : 'normal';
+  paper.style.fontSize = state.size + 'px';
+  paper.style.lineHeight = state.lineHeight;
+  paper.style.letterSpacing = state.letterSpace + 'px';
+  paper.style.textAlign = state.align;
+  paper.style.textTransform = state.textCase;
+
+  document.documentElement.style.setProperty('--paper', state.paperColor);
+  document.documentElement.style.setProperty('--text-col', state.textColor);
+  document.documentElement.style.setProperty('--paper-tilt', state.tilt + 'deg');
+  document.documentElement.style.setProperty('--grain-opacity', (state.grain/100));
+  document.documentElement.style.setProperty('--stroke-w', state.stroke + 'px');
+  document.documentElement.style.setProperty('--stroke-col', state.stroke > 0 ? state.textColor : 'transparent');
+  document.documentElement.style.setProperty('--blur', state.blur + 'px');
+  document.documentElement.style.setProperty('--g1', state.textColor);
+  document.documentElement.style.setProperty('--g2', state.gradColor2);
+  if(!state._blinking) document.documentElement.style.setProperty('--caret-col', state.caretColor);
+
+  wrap.classList.toggle('grad-text', state.gradient);
+  paper.style.background = state.gradient ? 'transparent' : state.paperColor;
+  paper.style.backgroundColor = state.paperColor;
+
+  stage.style.background = `radial-gradient(ellipse at 30% 20%, ${shade(state.bgColor,14)} 0%, transparent 60%), radial-gradient(ellipse at 80% 90%, ${shade(state.bgColor,-6)} 0%, transparent 55%), ${state.bgColor}`;
+
+  let glowShadow = state.glow > 0 ? `0 0 ${state.glow}px ${state.glow/2}px ${hexToRgba(state.textColor, .55)}` : '0 0 0 rgba(0,0,0,0)';
+  document.documentElement.style.setProperty('--accent-glow', glowShadow);
+
+  paper.style.textShadow = state.shadow > 0 ? `0 ${state.shadow/3}px ${state.shadow}px rgba(0,0,0,.35)` : 'none';
+
+  wrap.className = 'paper-wrap' + (state.texture !== 'none' ? ' tex-' + state.texture : '') + (state.gradient ? ' grad-text' : '') + (state.glitch ? ' glitch-on' : '');
+
+  $('matrixCanvas').classList.toggle('on', state.matrix);
+  document.body.classList.toggle('scanlines', state.scanlines);
+
+  updateCounts();
+}
+
+function shade(hex, percent){
+  hex = hex.replace('#','');
+  let r = parseInt(hex.substring(0,2),16);
+  let g = parseInt(hex.substring(2,4),16);
+  let b = parseInt(hex.substring(4,6),16);
+  r = Math.min(255, Math.max(0, r + Math.round(2.55*percent)));
+  g = Math.min(255, Math.max(0, g + Math.round(2.55*percent)));
+  b = Math.min(255, Math.max(0, b + Math.round(2.55*percent)));
+  return `rgb(${r},${g},${b})`;
+}
+function hexToRgba(hex, a){
+  hex = hex.replace('#','');
+  let r = parseInt(hex.substring(0,2),16);
+  let g = parseInt(hex.substring(2,4),16);
+  let b = parseInt(hex.substring(4,6),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function updateCounts(){
+  const text = paper.value.trim();
+  const words = text.length ? text.split(/\s+/).length : 0;
+  $('wordCount').textContent = words;
+  $('charCount').textContent = paper.value.length;
+}
+
+$('fontSelect').addEventListener('change', e => { state.font = e.target.value; apply(); });
+$('weight').addEventListener('input', e => { state.weight = e.target.value; apply(); });
+$('size').addEventListener('input', e => { state.size = e.target.value; apply(); });
+$('lineHeight').addEventListener('input', e => { state.lineHeight = e.target.value; apply(); });
+$('letterSpace').addEventListener('input', e => { state.letterSpace = e.target.value; apply(); });
+
+function bindSwitch(id, key){
+  $(id).addEventListener('click', e => {
+    state[key] = !state[key];
+    e.currentTarget.classList.toggle('on', state[key]);
+    apply();
+  });
+}
+bindSwitch('italicToggle','italic');
+bindSwitch('matrixToggle','matrix');
+bindSwitch('glitchToggle','glitch');
+bindSwitch('scanToggle','scanlines');
+
+$('gradToggle').addEventListener('click', e => {
+  state.gradient = !state.gradient;
+  e.currentTarget.classList.toggle('on', state.gradient);
+  $('gradRow').style.display = state.gradient ? 'flex' : 'none';
+  apply();
+});
+$('gradColor2').addEventListener('input', e => { state.gradColor2 = e.target.value; apply(); });
+
+function padGroup(groupId, key, cssKey){
+  document.querySelectorAll('#'+groupId+' .pad').forEach(p=>{
+    p.addEventListener('click', ()=>{
+      document.querySelectorAll('#'+groupId+' .pad').forEach(x=>x.classList.remove('active'));
+      p.classList.add('active');
+      state[key] = p.dataset[cssKey];
+      apply();
+    });
+  });
+}
+padGroup('alignPads','align','align');
+padGroup('casePads','textCase','case');
+padGroup('texPads','texture','tex');
+
+$('textColor').addEventListener('input', e=>{ state.textColor = e.target.value; apply(); });
+$('paperColor').addEventListener('input', e=>{ state.paperColor = e.target.value; apply(); });
+$('bgColor').addEventListener('input', e=>{ state.bgColor = e.target.value; apply(); });
+
+$('glow').addEventListener('input', e=>{ state.glow = +e.target.value; apply(); });
+$('shadow').addEventListener('input', e=>{ state.shadow = +e.target.value; apply(); });
+$('stroke').addEventListener('input', e=>{ state.stroke = +e.target.value; apply(); });
+$('blur').addEventListener('input', e=>{ state.blur = +e.target.value; apply(); });
+$('tilt').addEventListener('input', e=>{ state.tilt = +e.target.value; apply(); });
+$('grain').addEventListener('input', e=>{ state.grain = +e.target.value; apply(); });
+
+// ===== caret color + blink pulse =====
+let blinkTimer = null;
+$('caretColor').addEventListener('input', e=>{
+  state.caretColor = e.target.value;
+  document.documentElement.style.setProperty('--caret-col', state.caretColor);
+});
+$('caretBlink').addEventListener('input', e=>{
+  state.caretBlink = +e.target.value;
+  setupCaretBlink();
+});
+function setupCaretBlink(){
+  clearInterval(blinkTimer);
+  state._blinking = false;
+  document.documentElement.style.setProperty('--caret-col', state.caretColor);
+  if(state.caretBlink > 0){
+    const speed = 650 - state.caretBlink * 55;
+    let on = true;
+    blinkTimer = setInterval(()=>{
+      state._blinking = true;
+      on = !on;
+      document.documentElement.style.setProperty('--caret-col', on ? state.caretColor : 'transparent');
+    }, Math.max(80, speed));
+  }
+}
+
+// ===== custom font upload =====
+let customFontCount = 0;
+$('fontUploadBtn').addEventListener('click', ()=> $('fontFile').click());
+$('fontFile').addEventListener('change', async (e)=>{
+  const files = [...e.target.files];
+  for(const file of files){
+    try{
+      const buffer = await file.arrayBuffer();
+      const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9]/g,' ').trim() || ('CustomFont'+(customFontCount+1));
+      const familyName = 'Uploaded-' + cleanName.replace(/\s+/g,'') + '-' + Date.now();
+      const fontFace = new FontFace(familyName, buffer);
+      await fontFace.load();
+      document.fonts.add(fontFace);
+
+      customFontCount++;
+      const group = $('customFontGroup');
+      group.style.display = 'block';
+      const opt = document.createElement('option');
+      opt.value = `'${familyName}'`;
+      opt.textContent = cleanName;
+      group.appendChild(opt);
+
+      const list = $('fontList');
+      if(customFontCount === 1) list.innerHTML = '';
+      list.innerHTML += `<div>✓ <b>${cleanName}</b> loaded</div>`;
+
+      $('fontSelect').value = opt.value;
+      state.font = opt.value;
+      apply();
+    }catch(err){
+      const list = $('fontList');
+      list.innerHTML += `<div style="color:#ff3ea5;">✗ ${file.name} failed to load</div>`;
+    }
+  }
+  e.target.value = '';
+});
+
+// ===== documents, history, import/export =====
+let docs = [{ id:1, name:'Untitled-1', content:'' }];
+let activeDocId = 1;
+let docCounter = 1;
+const histories = { 1: { stack:[''], index:0 } };
+let historyTimer = null;
+
+function activeDoc(){ return docs.find(d=>d.id===activeDocId); }
+
+function renderDocTabs(){
+  const wrap = $('docTabs');
+  wrap.innerHTML = '';
+  docs.forEach(d=>{
+    const item = document.createElement('div');
+    item.className = 'doc-item' + (d.id===activeDocId ? ' active' : '');
+    item.innerHTML = `<span>${d.name}</span>` + (docs.length>1 ? `<span class="del" data-id="${d.id}">✕</span>` : '');
+    item.addEventListener('click', (e)=>{
+      if(e.target.classList.contains('del')){
+        e.stopPropagation();
+        deleteDoc(d.id);
+        return;
+      }
+      switchDoc(d.id);
+    });
+    wrap.appendChild(item);
+  });
+  $('docNameStatus').textContent = '◈ ' + activeDoc().name;
+}
+
+function switchDoc(id){
+  if(id === activeDocId) return;
+  activeDoc().content = paper.value;
+  activeDocId = id;
+  paper.value = activeDoc().content;
+  renderDocTabs();
+  updateCounts();
+  refreshHistoryUI();
+}
+
+function deleteDoc(id){
+  const idx = docs.findIndex(d=>d.id===id);
+  docs.splice(idx,1);
+  delete histories[id];
+  if(activeDocId === id){
+    activeDocId = docs[Math.max(0,idx-1)].id;
+    paper.value = activeDoc().content;
+    updateCounts();
+  }
+  renderDocTabs();
+  refreshHistoryUI();
+}
+
+$('addDocBtn').addEventListener('click', ()=>{
+  activeDoc().content = paper.value;
+  docCounter++;
+  const newDoc = { id:docCounter, name:'Untitled-'+docCounter, content:'' };
+  docs.push(newDoc);
+  histories[docCounter] = { stack:[''], index:0 };
+  activeDocId = docCounter;
+  paper.value = '';
+  renderDocTabs();
+  updateCounts();
+  refreshHistoryUI();
+  paper.focus();
+});
+
+function pushHistory(){
+  const h = histories[activeDocId];
+  if(h.stack[h.index] === paper.value) return;
+  h.stack = h.stack.slice(0, h.index+1);
+  h.stack.push(paper.value);
+  h.index = h.stack.length - 1;
+  if(h.stack.length > 100){ h.stack.shift(); h.index--; }
+  refreshHistoryUI();
+}
+
+function refreshHistoryUI(){
+  const h = histories[activeDocId];
+  $('historyScrub').max = h.stack.length - 1;
+  $('historyScrub').value = h.index;
+  $('historyNote').textContent = (h.index+1) + ' / ' + h.stack.length + ' snapshots';
+  $('undoBtn').disabled = h.index <= 0;
+  $('redoBtn').disabled = h.index >= h.stack.length - 1;
+}
+
+paper.addEventListener('input', ()=>{
+  updateCounts();
+  clearTimeout(historyTimer);
+  historyTimer = setTimeout(pushHistory, 500);
+});
+
+$('undoBtn').addEventListener('click', ()=>{
+  const h = histories[activeDocId];
+  if(h.index > 0){ h.index--; paper.value = h.stack[h.index]; updateCounts(); refreshHistoryUI(); }
+});
+$('redoBtn').addEventListener('click', ()=>{
+  const h = histories[activeDocId];
+  if(h.index < h.stack.length-1){ h.index++; paper.value = h.stack[h.index]; updateCounts(); refreshHistoryUI(); }
+});
+$('historyScrub').addEventListener('input', e=>{
+  const h = histories[activeDocId];
+  h.index = +e.target.value;
+  paper.value = h.stack[h.index];
+  updateCounts();
+  $('historyNote').textContent = (h.index+1) + ' / ' + h.stack.length + ' snapshots';
+});
+
+document.addEventListener('keydown', (e)=>{
+  if((e.ctrlKey||e.metaKey) && e.key==='z' && !e.shiftKey){ e.preventDefault(); $('undoBtn').click(); }
+  if((e.ctrlKey||e.metaKey) && (e.key==='y' || (e.key==='z' && e.shiftKey))){ e.preventDefault(); $('redoBtn').click(); }
+});
+
+// import
+$('importBtn').addEventListener('click', ()=> $('importFile').click());
+$('importFile').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev)=>{
+    paper.value = ev.target.result;
+    updateCounts();
+    pushHistory();
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+// export
+function downloadBlob(content, filename, type){
+  const blob = new Blob([content], {type});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+$('exportTxt').addEventListener('click', ()=> downloadBlob(paper.value, activeDoc().name + '.txt', 'text/plain'));
+$('exportMd').addEventListener('click', ()=> downloadBlob(paper.value, activeDoc().name + '.md', 'text/markdown'));
+$('exportPdf').addEventListener('click', ()=>{
+  try{
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const lines = doc.splitTextToSize(paper.value || ' ', 180);
+    doc.setFont('courier');
+    doc.setFontSize(11);
+    doc.text(lines, 15, 20);
+    doc.save(activeDoc().name + '.pdf');
+  }catch(err){
+    downloadBlob(paper.value, activeDoc().name + '.txt', 'text/plain');
+  }
+});
+
+// ===== find & replace =====
+$('findNextBtn').addEventListener('click', ()=>{
+  const term = $('findInput').value;
+  if(!term){ $('findStatus').textContent = 'Enter a search term first.'; return; }
+  const text = paper.value;
+  let from = paper.selectionEnd || 0;
+  let idx = text.indexOf(term, from);
+  if(idx === -1) idx = text.indexOf(term, 0);
+  if(idx === -1){ $('findStatus').textContent = 'No matches found.'; return; }
+  paper.focus();
+  paper.setSelectionRange(idx, idx + term.length);
+  const count = text.split(term).length - 1;
+  $('findStatus').textContent = count + ' match(es) in document.';
+});
+$('replaceBtn').addEventListener('click', ()=>{
+  const term = $('findInput').value;
+  const rep = $('replaceInput').value;
+  if(!term) return;
+  const sel = paper.value.substring(paper.selectionStart, paper.selectionEnd);
+  if(sel === term){
+    const before = paper.value.substring(0, paper.selectionStart);
+    const after = paper.value.substring(paper.selectionEnd);
+    paper.value = before + rep + after;
+    paper.setSelectionRange(before.length, before.length + rep.length);
+    updateCounts();
+    pushHistory();
+  }
+  $('findNextBtn').click();
+});
+$('replaceAllBtn').addEventListener('click', ()=>{
+  const term = $('findInput').value;
+  const rep = $('replaceInput').value;
+  if(!term){ $('findStatus').textContent = 'Enter a search term first.'; return; }
+  const count = paper.value.split(term).length - 1;
+  paper.value = paper.value.split(term).join(rep);
+  updateCounts();
+  pushHistory();
+  $('findStatus').textContent = 'Replaced ' + count + ' occurrence(s).';
+});
+
+// ===== emoji / symbol picker =====
+const emojiSet = ['✦','★','☾','☀','⚡','◈','▲','●','■','◆','♫','☁','✔','✕','→','←','↑','↓','§','¶','∞','©','™','℮','†','‡','•','‹','›','‰','€','£','¥','☺','☠','⚔','⌘','⏣','⬡','♦','♣','♠','♥','☯','⚙','☂','☘'];
+const grid = $('emojiGrid');
+emojiSet.forEach(sym=>{
+  const btn = document.createElement('div');
+  btn.className = 'emoji-btn';
+  btn.textContent = sym;
+  btn.addEventListener('click', ()=>{
+    const start = paper.selectionStart;
+    const end = paper.selectionEnd;
+    paper.value = paper.value.substring(0,start) + sym + paper.value.substring(end);
+    paper.focus();
+    paper.setSelectionRange(start+sym.length, start+sym.length);
+    updateCounts();
+    clearTimeout(historyTimer);
+    historyTimer = setTimeout(pushHistory, 500);
+  });
+  grid.appendChild(btn);
+});
+
+// ===== chaos / reset =====
+function getFontOptions(){ return [...document.querySelectorAll('#fontSelect option')].map(o=>o.value); }
+function rand(min,max){ return Math.random()*(max-min)+min; }
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function randHex(){ return '#'+Math.floor(rand(0,0xffffff)).toString(16).padStart(6,'0'); }
+function shadeToHex(hex, percent){
+  hex = hex.replace('#','');
+  let r = parseInt(hex.substring(0,2),16);
+  let g = parseInt(hex.substring(2,4),16);
+  let b = parseInt(hex.substring(4,6),16);
+  r = Math.min(255, Math.max(0, r + Math.round(2.55*percent)));
+  g = Math.min(255, Math.max(0, g + Math.round(2.55*percent)));
+  b = Math.min(255, Math.max(0, b + Math.round(2.55*percent)));
+  return '#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('');
+}
+
+$('chaosBtn').addEventListener('click', ()=>{
+  const fontOptions = getFontOptions();
+  state.font = pick(fontOptions);
+  $('fontSelect').value = state.font;
+
+  state.weight = pick([300,400,500,600,700,800,900]);
+  $('weight').value = state.weight;
+
+  state.size = Math.round(rand(14,44));
+  $('size').value = state.size;
+
+  state.lineHeight = +rand(1,2.4).toFixed(2);
+  $('lineHeight').value = state.lineHeight;
+
+  state.letterSpace = +rand(-1,8).toFixed(1);
+  $('letterSpace').value = state.letterSpace;
+
+  state.italic = Math.random() > 0.75;
+  $('italicToggle').classList.toggle('on', state.italic);
+
+  const aligns = ['left','center','right'];
+  state.align = pick(aligns);
+  document.querySelectorAll('#alignPads .pad').forEach(p=>p.classList.toggle('active', p.dataset.align===state.align));
+
+  const cases = ['none','uppercase','capitalize'];
+  state.textCase = pick(cases);
+  document.querySelectorAll('#casePads .pad').forEach(p=>p.classList.toggle('active', p.dataset.case===state.textCase));
+
+  const texes = ['none','lines','grid','dots'];
+  state.texture = pick(texes);
+  document.querySelectorAll('#texPads .pad').forEach(p=>p.classList.toggle('active', p.dataset.tex===state.texture));
+
+  const dark = Math.random() > 0.5;
+  state.paperColor = dark ? shadeToHex(randHex(), -70) : shadeToHex(randHex(), 70);
+  state.textColor = dark ? '#f0e9d8' : '#1a1420';
+  state.bgColor = randHex();
+  $('textColor').value = state.textColor;
+  $('paperColor').value = state.paperColor;
+  $('bgColor').value = state.bgColor;
+
+  state.gradient = Math.random() > 0.7;
+  $('gradToggle').classList.toggle('on', state.gradient);
+  $('gradRow').style.display = state.gradient ? 'flex' : 'none';
+  state.gradColor2 = randHex();
+  $('gradColor2').value = state.gradColor2;
+
+  state.glow = Math.random() > 0.6 ? Math.round(rand(6,30)) : 0;
+  $('glow').value = state.glow;
+
+  state.shadow = Math.random() > 0.5 ? Math.round(rand(2,14)) : 0;
+  $('shadow').value = state.shadow;
+
+  state.stroke = Math.random() > 0.75 ? +rand(0.5,2).toFixed(2) : 0;
+  $('stroke').value = state.stroke;
+
+  state.blur = Math.random() > 0.85 ? +rand(0.5,2).toFixed(1) : 0;
+  $('blur').value = state.blur;
+
+  state.tilt = +rand(-4,4).toFixed(1);
+  $('tilt').value = state.tilt;
+
+  state.grain = Math.round(rand(0,15));
+  $('grain').value = state.grain;
+
+  apply();
+});
+
+$('resetBtn').addEventListener('click', ()=>{ location.reload(); });
+
+// ===== matrix rain =====
+const canvas = $('matrixCanvas');
+const ctx = canvas.getContext('2d');
+let mw, mh, columns, drops;
+const glyphs = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789日ﾊﾐﾋｰｳｼﾅﾓﾆｻﾜﾂｵﾘｱﾎﾃﾏｹﾒｴｶｷﾑﾕﾗｾﾈｽﾀﾇﾍ';
+
+function resizeCanvas(){
+  mw = canvas.width = stage.clientWidth;
+  mh = canvas.height = stage.clientHeight;
+  columns = Math.floor(mw / 18);
+  drops = new Array(columns).fill(0).map(()=> Math.random() * -50);
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+function drawMatrix(){
+  if(state.matrix){
+    ctx.fillStyle = 'rgba(0,0,0,0.08)';
+    ctx.fillRect(0,0,mw,mh);
+    ctx.font = '16px monospace';
+    for(let i=0;i<columns;i++){
+      const text = glyphs[Math.floor(Math.random()*glyphs.length)];
+      const x = i*18;
+      const y = drops[i]*18;
+      ctx.fillStyle = 'rgba(77,232,255,0.85)';
+      ctx.fillText(text, x, y);
+      if(y > mh && Math.random() > 0.975) drops[i] = 0;
+      drops[i]++;
+    }
+  } else {
+    ctx.clearRect(0,0,mw,mh);
+  }
+  requestAnimationFrame(drawMatrix);
+}
+drawMatrix();
+
+function tick(){
+  const d = new Date();
+  $('clock').textContent = d.toTimeString().split(' ')[0];
+}
+setInterval(tick, 1000);
+tick();
+
+renderDocTabs();
+refreshHistoryUI();
+apply();
+</script>
+</body>
+</html>
